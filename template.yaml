@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
   python-kinesis-filter
@@ -11,29 +11,52 @@ Globals:
     Timeout: 3
 
 Resources:
+  # Define Lambda Function
   HelloWorldFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: hello_world/
-      Handler: app.lambda_handler
+      CodeUri: kinesis_filter/ # folder in project
+      Handler: app.lambda_handler # filename.methodname
       Runtime: python3.8
-      Events:
-        HelloWorld:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+      Events: # Define trigger for lambda execution
+        Stream:
+          Type: Kinesis
           Properties:
-            Path: /hello
-            Method: get
+            Stream: !GetAtt SourceStream.Arn
+            BatchSize: 1000
+            # MaximumBatchingWindowInSeconds: 30
+            StartingPosition: LATEST
+      Policies:
+        - KinesisStreamReadPolicy:
+            StreamName: !Ref SourceStream
+        - KinesisCrudPolicy:
+            StreamName: !Ref SinkStream
+      Environment:
+        Variables:
+          SINKSTREAM: !Ref SinkStream
+          SOURCESTREAM: !Ref SourceStream
 
-Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  # Define input and output streams
+  SourceStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: SourceStream
+      ShardCount: 1
+  SinkStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: SinkStream
+      ShardCount: 1
+# Outputs:
+# ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+# Find out more about other implicit resources you can reference within SAM
+# https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+# HelloWorldApi:
+#   Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+#   Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+# HelloWorldFunction:
+#   Description: "Hello World Lambda Function ARN"
+#   Value: !GetAtt HelloWorldFunction.Arn
+# HelloWorldFunctionIamRole:
+#   Description: "Implicit IAM Role created for Hello World function"
+#   Value: !GetAtt HelloWorldFunctionRole.Arn
